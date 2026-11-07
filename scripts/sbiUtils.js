@@ -167,8 +167,8 @@ export class sbiUtils {
 
     static async getItemFromPackAsync(pack, itemName) {
         let result = null;
-        const normalizedName = itemName.toLowerCase().replace(/[^a-zA-Z0-9]/g, "_");
-        const item = pack.index.find(e => normalizedName === e.name.toLowerCase().replace(/[^a-zA-Z0-9]/g, "_"));
+        const normalizedName = this.normalizeName(itemName);
+        const item = pack.index.find(e => normalizedName === this.normalizeName(e.name));
 
         if (item) {
             const itemDoc = await pack.getDocument(item._id);
@@ -177,6 +177,10 @@ export class sbiUtils {
         }
 
         return result;
+    }
+
+    static normalizeName(name) {
+        return name.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "_");
     }
 
     // ==========================

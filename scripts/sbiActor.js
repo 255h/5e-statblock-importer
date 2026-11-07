@@ -99,8 +99,8 @@ export class sbiActor {
         let enrichedDescription = description;
 
         function compareItems(a, b) {
-            const simpleA = a.toLowerCase().replace(/[\W_]/g, "_").replace(/s$/, "");
-            const simpleB = b.toLowerCase().replace(/[\W_]/g, "_").replace(/s$/, "");
+            const simpleA = sUtils.normalizeName(a).replace(/s$/, "");
+            const simpleB = sUtils.normalizeName(b).replace(/s$/, "");
             return simpleA === simpleB;
         }
 
@@ -162,20 +162,28 @@ export class sbiActor {
 
     /*** Actions */
 
+    isActionDescription(actionData) {
+        return actionData.value.isDescription ?? actionData.name === "Description";
+    }
+
+    getActionDescription(actionData) {
+        return actionData.value.description ?? sUtils.combineSourceLines(actionData.value.lines, !this.isActionDescription(actionData));
+    }
+
     async setActions() {
         for (const actionData of this.actions) {
             const name = actionData.name;
             const lowerName = name.toLowerCase();
-            const description = this.enrichDescription(sUtils.combineSourceLines(actionData.value.lines));
+            const description = this.enrichDescription(this.getActionDescription(actionData));
 
             const itemData = {};
-            itemData.name = sUtils.capitalizeAll(name);
+            itemData.name = actionData.value.displayName ?? sUtils.capitalizeAll(name);
             itemData.type = "feat";
 
             foundry.utils.setProperty(itemData, "system.description.value", description);
 
             // The "Multiattack" action isn't a real action, so there's nothing more to add to it.
-            if (lowerName !== "multiattack") {
+            if (!(actionData.value.isMultiattack ?? lowerName === "multiattack")) {
                 // We'll assume that an NPC with stuff will have that stuff identified, equipped, attuned, etc.
                 foundry.utils.setProperty(itemData, "system.identified", true);
                 foundry.utils.setProperty(itemData, "system.equipped", true);
@@ -203,7 +211,7 @@ export class sbiActor {
                 itemData.type = "spell";
                 foundry.utils.setProperty(itemData, "system.preparation.mode", "innate");
                 foundry.utils.setProperty(itemData, "system.level", actionData.value.spell.level);
-                foundry.utils.setProperty(itemData, "system.properties", ["concentration"]);
+                foundry.utils.setProperty(itemData, "system.properties", actionData.value.spell.concentration ? ["concentration"] : []);
             }
 
             this.addItem(itemData);
@@ -219,7 +227,7 @@ export class sbiActor {
 
         if (type === Blocks.lairActions.id) {
             activationType = "lair";
-            isLairActionDescriptionOnly = !this[type].some(a => a.name !== "Description");
+            isLairActionDescriptionOnly = this[type].every(a => this.isActionDescription(a));
         } else if (isLegendaryTypeAction) {
             activationType = "legendary";
         } else if (type === Blocks.mythicActions.id) {
@@ -229,7 +237,7 @@ export class sbiActor {
         // Create the items for each action.
         for (const actionData of this[type]) {
             const actionName = actionData.name;
-            const description = this.enrichDescription(sUtils.combineSourceLines(actionData.value.lines, actionData.name !== "Description"));
+            const description = this.enrichDescription(this.getActionDescription(actionData));
 
             const itemData = {};
             itemData.name = actionName;
@@ -237,8 +245,8 @@ export class sbiActor {
 
             foundry.utils.setProperty(itemData, "system.description.value", description);
 
-            if (actionName === "Description") {
-                itemData.name = sUtils.camelToTitleCase(type);
+            if (this.isActionDescription(actionData)) {
+                itemData.name = actionName === "Description" ? sUtils.camelToTitleCase(type) : actionName;
 
                 const matchingImage = await sUtils.getImgFromPackItemAsync(itemData.name.toLowerCase());
                 if (matchingImage) itemData.img = matchingImage;
@@ -274,18 +282,21 @@ export class sbiActor {
                 if (matchingImage) itemData.img = matchingImage;
 
                 this.setAttackOrSave(actionData, itemData);
+                this.setPerDay(actionData, itemData);
                 this.setRecharge(actionData, itemData);
                 await this.setCastSpells(actionData, itemData);
 
-                for (let activityId in itemData.system.activities) {
+                for (let activityId in itemData.system?.activities ?? {}) {
                     foundry.utils.setProperty(itemData, `system.activities.${activityId}.activation`, {override: true, type: activationType, value: actionCost});
                 }
             }
 
-            if (Object.keys(itemData.system.activities ?? {}).length == 0 && (actionName !== "Description" || isLairActionDescriptionOnly)) {
+            if (Object.keys(itemData.system.activities ?? {}).length == 0 && (!this.isActionDescription(actionData) || isLairActionDescriptionOnly)) {
                 let activityId = foundry.utils.randomID();
-                foundry.utils.setProperty(itemData, `system.activities.${activityId}`, {_id: activityId, type: "utility", activation: {type: activationType, value: 1}});
+                foundry.utils.setProperty(itemData, `system.activities.${activityId}`, {_id: activityId, type: "utility", activation: {type: activationType, value: actionData.value.actionCost || 1}});
             }
+
+            this.setTarget(actionData, itemData);
 
             this.addItem(itemData);
         }
@@ -295,10 +306,10 @@ export class sbiActor {
     async setMinorActions(type) {
         for (const actionData of this[type]) {
             const name = actionData.name;
-            const description = this.enrichDescription(sUtils.combineSourceLines(actionData.value.lines));
+            const description = this.enrichDescription(this.getActionDescription(actionData));
 
             const itemData = {};
-            itemData.name = sUtils.capitalizeAll(name);
+            itemData.name = actionData.value.displayName ?? sUtils.capitalizeAll(name);
             itemData.type = "feat";
 
             foundry.utils.setProperty(itemData, "system.description.value", description);
@@ -323,6 +334,7 @@ export class sbiActor {
 
             this.setPerDay(actionData, itemData);
             this.setRecharge(actionData, itemData);
+            this.setTarget(actionData, itemData);
             await this.setCastSpells(actionData, itemData);
 
             const matchingImage = await sUtils.getImgFromPackItemAsync(itemData.name.toLowerCase());
@@ -372,7 +384,7 @@ export class sbiActor {
 
             const attackAbilityValue = this.#dnd5e.system.abilities[attackAbility]?.value || 10;
             const calculatedToHit = sUtils.getAbilityMod(attackAbilityValue) + sUtils.getProficiencyBonus(this.#dnd5e.system.details.cr);
-            if (actionData.value.attack.toHit && calculatedToHit != actionData.value.attack.toHit) {
+            if (actionData.value.attack.toHit != null && calculatedToHit != actionData.value.attack.toHit) {
                 foundry.utils.setProperty(itemData, `system.activities.${attackActivityId}.attack.flat`, true);
                 foundry.utils.setProperty(itemData, `system.activities.${attackActivityId}.attack.bonus`, parseInt(actionData.value.attack.toHit));
             }
@@ -406,7 +418,17 @@ export class sbiActor {
         const damageParts = [];
 
         const {damageRoll, damageType, damageMod, plusDamageRoll, plusDamageType, plusDamageMod} = actionData.value.damage;
-        const hasDamageMod = !!damageMod;
+        const hasDamageMod = damageMod != null;
+        const attackDamageBonus = modifier => {
+            let attackAbility = itemData.system.activities[activityId].attack?.ability;
+            if (!attackAbility) {
+                attackAbility = sUtils.getAbilityMod(this.#dnd5e.system.abilities.str?.value) > sUtils.getAbilityMod(this.#dnd5e.system.abilities.dex?.value) ? "str" : "dex";
+            }
+            if (attackAbility === "spellcasting") attackAbility = this.#dnd5e.system.attributes?.spellcasting;
+            const abilityMod = sUtils.getAbilityMod(this.#dnd5e.system.abilities[attackAbility]?.value ?? 10);
+            const difference = Number(modifier) - abilityMod;
+            return difference ? "@mod " + (difference > 0 ? "+" : "-") + Math.abs(difference) : undefined;
+        };
 
         if (damageRoll && damageType) {
             let damagePart;
@@ -422,23 +444,12 @@ export class sbiActor {
                     types: [damageType]
                 }
             }
-            if (activity === "attack" && hasDamageMod) {
+            if (activity === "attack" && actionData.value.type !== "spell" && hasDamageMod) {
                 // Some monsters have attacks where the damage doesn't match the modifier.
-                let attackAbility = itemData.system.activities[activityId].attack?.ability;
-                if (!attackAbility) {
-                    attackAbility = sUtils.getAbilityMod(this.#dnd5e.system.abilities.str?.value) > sUtils.getAbilityMod(this.#dnd5e.system.abilities.dex?.value) ? "str" : "dex";
-                }
-                if (attackAbility === "spellcasting") {
-                    attackAbility = this.#dnd5e.system.attributes?.spellcasting;
-                }
-                const attackAbilityValue = this.#dnd5e.system.abilities[attackAbility]?.value || 10;
-                const abilityMod = sUtils.getAbilityMod(attackAbilityValue);
-                if (damageMod != abilityMod) {
-                    const diff = damageMod - abilityMod;
-                    damagePart.bonus = "@mod " + (diff > 0 ? "+" : "-") + Math.abs(diff);
-                }
+                const bonus = attackDamageBonus(damageMod);
+                if (bonus !== undefined) damagePart.bonus = bonus;
             }
-            if (activity === "save" && hasDamageMod) {
+            if ((activity === "save" || actionData.value.type === "spell") && hasDamageMod) {
                 damagePart.bonus = damageMod;
             }
             damageParts.push(damagePart);
@@ -457,6 +468,7 @@ export class sbiActor {
                     types: [plusDamageType]
                 });
             }
+            if (plusDamageMod != null) damageParts[damageParts.length - 1].bonus = plusDamageMod;
         }
 
         foundry.utils.setProperty(itemData, `system.damage.base`, damageParts[0]);
@@ -491,6 +503,11 @@ export class sbiActor {
                     types: [versatileDamageType]
                 }
             }
+            const versatileModifier = actionData.value.damage.versatileDamageMod;
+            if (versatileModifier != null) {
+                const bonus = activity === "attack" ? attackDamageBonus(versatileModifier) : versatileModifier;
+                if (bonus !== undefined) versatileDamagePart.bonus = bonus;
+            }
             foundry.utils.setProperty(itemData, `system.damage.versatile`, versatileDamagePart);
             foundry.utils.setProperty(itemData, `system.properties.ver`, true);
         }
@@ -500,16 +517,16 @@ export class sbiActor {
         for (const featureData of this.features) {
             const name = featureData.name;
             const nameLower = name.toLowerCase();
-            const description = this.enrichDescription(sUtils.combineSourceLines(featureData.value.lines));
+            const description = this.enrichDescription(this.getActionDescription(featureData));
             const itemData = {};
 
-            itemData.name = sUtils.capitalizeAll(name);
+            itemData.name = featureData.value.displayName ?? sUtils.capitalizeAll(name);
             itemData.type = "feat";
 
             foundry.utils.setProperty(itemData, "system.description.value", description);
             this.setAttackOrSave(featureData, itemData);
 
-            if (nameLower.startsWith("legendary resistance")) {
+            if (featureData.value.legendaryResistanceCount != null || nameLower.startsWith("legendary resistance")) {
                 // Lair Actions are often not included in the statblock itself. We check the legendary resistance description for lair mentions
                 if (/\bin\slair\b/i.test(featureData.value.lines[0].line)) {
                     this.set5eProperty("system.resources.lair.value", true);
@@ -535,6 +552,8 @@ export class sbiActor {
                 });
             } else {
                 this.setPerDay(featureData, itemData);
+                this.setRecharge(featureData, itemData);
+                this.setTarget(featureData, itemData);
                 await this.setCastSpells(featureData, itemData);
                 // What was this for?
                 //if (itemData.system.uses?.max || featureData.value.attack || featureData.value.save) {
@@ -595,7 +614,7 @@ export class sbiActor {
                     _id: foundry.utils.randomID(),
                     type: "cast",
                     spell: {
-                        uuid: spell.sourceUuid,
+                        uuid: spell.sourceUuid ?? spell.uuid,
                         level: spellObj.level ?? spell.system.level,
                         spellbook: false, // this will be updated after the actor is created
                     }
@@ -691,6 +710,10 @@ export class sbiActor {
 
     setTarget(actionData, itemData) {
         if (actionData.value.target) {
+            if (!Object.keys(itemData.system?.activities ?? {}).length) {
+                const id = foundry.utils.randomID();
+                foundry.utils.setProperty(itemData, `system.activities.${id}`, {_id: id, type: "utility", activation: {type: "special"}});
+            }
             let activityId = Object.values(itemData.system.activities).find(a => a.type == "save")?._id;
             if (!activityId) {
                 activityId = Object.values(itemData.system.activities)[0]?._id;
@@ -759,7 +782,7 @@ export class sbiActor {
                 item.system.equipped = true;
                 item.system.proficient = true;
                 item.system.attunement = 2;
-                item.system.quantity = gearItem.quantity;
+                item.system.quantity = gearItem.value;
                 this.addItem(item);
             }
         }
@@ -813,7 +836,7 @@ export class sbiActor {
 
             // Check if AC needs fixed (if mage armor, skip check)
             if (this.armor && !this.armor.types.includes("mage") && this.armor.ac !== actor5e.system.attributes.ac.value) {
-                actor5e.update({
+                await actor5e.update({
                     "system.attributes.ac.calc": "flat",
                     "system.attributes.ac.flat": this.armor.ac
                 });
@@ -825,7 +848,7 @@ export class sbiActor {
 
                     // We only display the spell in the spellbook if it's not already granted by the Spellcasting feature
                     const spellAlreadyInSpellcasting = castActivity.item.name !== this.spellcastingFeature?.featureName && this.spellcastingFeature?.spellInfo?.some(
-                        spellGroup => Array.isArray(spellGroup.value) && spellGroup.value.some(s => s.name.toLowerCase().replace(/[^a-zA-Z0-9]/g, "_") === castActivity._inferredSource.name.toLowerCase().replace(/[^a-zA-Z0-9]/g, "_"))
+                        spellGroup => Array.isArray(spellGroup.value) && spellGroup.value.some(s => sUtils.normalizeName(s.name) === sUtils.normalizeName(castActivity._inferredSource.name))
                     );
 
                     if (!spellAlreadyInSpellcasting) {
@@ -1066,8 +1089,16 @@ export class sbiActor {
             this.set5eProperty("system.attributes.spellcasting", sUtils.convertToShortAbility(spellcastingDetails.ability));
         }
 
+        if (spellcastingDetails.saveDc != null) {
+            const ability = this.#dnd5e.system.attributes?.spellcasting;
+            const score = this.#dnd5e.system.abilities[ability]?.value ?? 10;
+            const baseDc = 8 + sUtils.getAbilityMod(score) + sUtils.getProficiencyBonus(this.#dnd5e.system.details.cr);
+            this.set5eProperty("system.bonuses.spell.dc", String(Number(spellcastingDetails.saveDc) - baseDc));
+        }
+
         if (spellInfo.length) {
-            const description = spellInfo[0].value.replace(new RegExp(`${featureName}\\s*(\\([^)]*\\))?\\.`, "ig"), "");
+            const escapedFeatureName = featureName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const description = this[spellcastingType].description ?? spellInfo[0].value.replace(new RegExp(`${escapedFeatureName}\\s*(\\([^)]*\\))?\\.`, "ig"), "");
 
             const spells = spellInfo.slice(1);
             const spellObjs = spells.map(sg => sg.value).flat();
@@ -1094,8 +1125,9 @@ export class sbiActor {
 
                 if (spellObj.type === "slots") {
                     // Update the actor's number of slots per level.
-                    this.set5eProperty(`system.spells.spell${spell.system.level}.value`, spellObj.count);
-                    this.set5eProperty(`system.spells.spell${spell.system.level}.override`, spellObj.count);
+                    const slotLevel = spellObj.level ?? spell.system.level;
+                    this.set5eProperty(`system.spells.spell${slotLevel}.value`, spellObj.count);
+                    this.set5eProperty(`system.spells.spell${slotLevel}.override`, spellObj.count);
                     if (!useActivities) {
                         foundry.utils.setProperty(spell, "system.preparation.prepared", true);
                     }
@@ -1146,8 +1178,8 @@ export class sbiActor {
             }
 
             const descriptionLines = [];
+            descriptionLines.push(`<p>${description}</p>`);
             if (spells.length) {
-                descriptionLines.push(`<p>${description}</p>`);
 
                 // Put spell groups on their own lines in the description so that it reads better.
                 function getSpellDescription(spell) {

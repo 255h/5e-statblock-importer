@@ -9,12 +9,21 @@
             <button id="sbi-import-reset" type="button" data-action="reset">Reset</button>
         </div>
     </section>
-    <div id="sbi-input" contenteditable="true" data-placeholder="Usage:
-- Paste the full statblock text into this box. It should follow WotC formatting to be imported correctly. Markdown is supported too.
-- You can click on the &quot;Parse&quot; button above to preview all the information that the module is able to parse from the text (the &quot;Auto Parse&quot; checkbox will automatically do that for you after every change).
-- If you need to, you can edit the text here to fix any errors. The &quot;Import&quot; button below will parse and create the actor based on the current text.
-
-Report any bugs using the module link, and add the statblock you were trying to import."></div>
+    <div class="form-group">
+        <label for="sbi-json-file">Load JSON file:</label>
+        <div class="form-fields">
+            <input id="sbi-json-file" type="file" accept=".json,application/json" />
+        </div>
+        <button type="button" data-action="compendiumOptions">Compendium Options</button>
+    </div>
+    <label for="sbi-input">JSON statblock</label>
+    <textarea id="sbi-input" spellcheck="false" aria-label="JSON statblock" placeholder='Paste a JSON statblock here, or load a .json file above.
+Example: {"name":"Goblin","health":{"value":7,"formula":"2d6"},"abilities":{"str":8,"dex":14,"con":10,"int":10,"wis":8,"cha":8},"challenge":{"cr":"1/4"}}
+See README.md for the complete format. Parse validates the data and shows a preview; Import creates the NPC.'></textarea>
+    <details id="sbi-preview-container">
+        <summary>Parsed data preview</summary>
+        <pre id="sbi-preview"></pre>
+    </details>
     <section id="sbi-issues"></section>
     <section id="sbi-bottom">
         <span id="sbi-import-text">Folder to import to:</span>

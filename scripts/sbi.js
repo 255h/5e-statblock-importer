@@ -2,16 +2,16 @@ import { MODULE_NAME } from "./sbiConfig.js";
 import { registerSettings } from "./sbiConfig.js";
 import { sbiUtils } from "./sbiUtils.js";
 import { sbiWindow } from "./sbiWindow.js";
-import { sbiParser } from "./sbiParser.js";
+import { sbiJsonParser } from "./sbiJsonParser.js";
 
 Hooks.on("init", () => {
     registerSettings();
-    const parse = sbiParser.parseInput.bind(sbiParser);
+    const parse = sbiJsonParser.parseInput.bind(sbiJsonParser);
 
     game.modules.get(MODULE_NAME).api = {
         parse,
-        import: async (text, folderId) => {
-            return await parse(text).actor?.createActor5e(folderId);
+        import: async (json, folderId) => {
+            return await parse(json).actor.createActor5e(folderId);
         }
     };
 });
@@ -24,7 +24,7 @@ Hooks.on("renderActorDirectory", (app, html, data) => {
         importButton = document.createElement("button");
         importButton.id = "sbi-main-button";
         importButton.setAttribute("type", "button")
-        importButton.innerHTML = `<i class="fas fa-file-import"></i>Import Statblock`;
+        importButton.innerHTML = `<i class="fas fa-file-import"></i>Import JSON Statblock`;
         importButton.addEventListener("click", () => {
             sbiUtils.log("SBI button clicked");
             sbiWindow.renderWindow();

@@ -1,0 +1,68 @@
+{
+  "name": "Glabrezu",
+  "size": "large",
+  "type": "fiend",
+  "race": "demon",
+  "alignment": "chaotic evil",
+  "armor": { "ac": 17, "types": ["natural armor"] },
+  "health": { "value": 157, "formula": "15d10 + 75" },
+  "speeds": { "walk": 40 },
+  "abilities": { "str": 20, "dex": 15, "con": 21, "int": 19, "wis": 17, "cha": 16 },
+  "savingThrows": ["str", "con", "wis", "cha"],
+  "damagesAndConditions": {
+    "damageResistances": {
+      "types": ["cold", "fire", "lightning", "bludgeoning", "piercing", "slashing"],
+      "bypasses": ["mgc"]
+    },
+    "damageImmunities": { "types": ["poison"] },
+    "conditionImmunities": { "types": ["poisoned"] }
+  },
+  "senses": { "truesight": 120, "perception": 13 },
+  "language": { "knownLanguages": ["abyssal"], "telepathy": 120 },
+  "challenge": { "cr": 9, "xp": 5000, "pb": 4 },
+  "innateSpellcasting": {
+    "ability": "int",
+    "saveDc": 16,
+    "description": "The glabrezu can innately cast the following spells, requiring no material components.",
+    "groups": [
+      {
+        "name": "At will",
+        "spells": [
+          { "name": "Darkness", "type": "at will" },
+          { "name": "Detect Magic", "type": "at will" },
+          { "name": "Dispel Magic", "type": "at will" }
+        ]
+      },
+      {
+        "name": "1/day each",
+        "spells": [
+          { "name": "Confusion", "type": "innate", "count": 1 },
+          { "name": "Fly", "type": "innate", "count": 1 },
+          { "name": "Power Word Stun", "type": "innate", "count": 1 }
+        ]
+      }
+    ]
+  },
+  "features": [
+    { "name": "Magic Resistance", "description": "The glabrezu has advantage on saving throws against spells and other magical effects." }
+  ],
+  "actions": [
+    { "name": "Multiattack", "description": "The glabrezu makes four attacks: two with its pincers and two with its fists. Alternatively, it makes two attacks with its pincers and casts one spell." },
+    {
+      "name": "Pincer",
+      "description": "A Medium or smaller target is grappled (escape DC 15). Each of the glabrezu's two pincers can grapple one target.",
+      "attack": { "toHit": 9, "condition": "grappled" },
+      "reach": 10,
+      "damage": { "damageRoll": "2d10", "damageMod": 5, "damageType": "bludgeoning" },
+      "target": { "type": "creature", "amount": 1 }
+    },
+    {
+      "name": "Fist",
+      "attack": { "toHit": 9 },
+      "reach": 5,
+      "damage": { "damageRoll": "2d4", "damageMod": 2, "damageType": "bludgeoning" },
+      "target": { "type": "creature", "amount": 1 }
+    }
+  ],
+  "source": { "book": "SRD" }
+}

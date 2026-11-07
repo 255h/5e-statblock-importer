@@ -58,6 +58,27 @@ body {
     white-space: pre-wrap;
     flex: 1;
     position: relative;
+    min-height: 180px;
+    resize: vertical;
+    font-family: monospace;
+}
+
+#sbi-preview-container {
+    max-height: 35%;
+    overflow: auto;
+    flex-shrink: 0;
+}
+
+#sbi-preview {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+#sbi-issues {
+    max-height: 120px;
+    overflow: auto;
+    flex-shrink: 0;
 }
 
 #sbi-input:empty::before {

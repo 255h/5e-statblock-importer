@@ -1,0 +1,52 @@
+{
+  "name": "Страж Пепельной башни",
+  "size": "medium",
+  "type": "humanoid",
+  "race": "человек",
+  "alignment": "законно-нейтральный",
+  "armor": { "ac": 17 },
+  "health": { "value": 45, "formula": "6d8 + 18" },
+  "abilities": { "str": 16, "dex": 12, "con": 16, "int": 10, "wis": 14, "cha": 10 },
+  "savingThrows": ["str", "con"],
+  "skills": { "perception": 4, "athletics": 5 },
+  "speeds": { "walk": 30 },
+  "language": { "knownLanguages": ["common"] },
+  "challenge": { "cr": 2 },
+  "features": [
+    {
+      "name": "Несгибаемая воля",
+      "description": "Провалив спасбросок, страж может вместо этого преуспеть. Доступно один раз в день.",
+      "perDay": 1,
+      "legendaryResistanceCount": 1
+    }
+  ],
+  "actions": [
+    {
+      "name": "Мультиатака",
+      "description": "Страж совершает две атаки копьём.",
+      "isMultiattack": true
+    },
+    {
+      "name": "Копьё «Заря»",
+      "description": "Страж наносит удар копьём. При хвате двумя руками урон увеличивается.",
+      "attack": { "toHit": 5 },
+      "reach": 5,
+      "damage": {
+        "damageRoll": "1d6", "damageType": "piercing", "damageMod": 3,
+        "versatileDamageRoll": "1d8", "versatileDamageType": "piercing", "versatileDamageMod": 3
+      },
+      "target": { "type": "creature", "amount": 1 }
+    }
+  ],
+  "reactions": [
+    {
+      "name": "Защитный шаг",
+      "description": "Когда союзник в пределах 5 футов получает урон, страж перемещается на 5 футов к нему, не провоцируя атаки.",
+      "perDay": 2
+    }
+  ],
+  "otherInfo": [
+    "Страж поклялся охранять Пепельную башню. Он уважает честное слово и не оставляет товарищей в беде."
+  ],
+  "source": { "book": "Авторский NPC" }
+}
